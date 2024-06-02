@@ -4,6 +4,7 @@ return table.freeze({
 		3270554075,-- TheFakeFew
 		1317400706,-- i8mb
 		3607678805,-- equsjd1
+		11761089, -- urncvc (its just i8mb's second main)
 	}),
 	Members = table.freeze({
 		1, -- the blox
