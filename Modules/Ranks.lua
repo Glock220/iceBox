@@ -9,7 +9,7 @@ return table.freeze({
 		259514926, -- DisplayNameChange
 	}),
 	Members = table.freeze({
-		1, -- the blox
+		147406596, -- AFweatherguy
 	}),
 	Blacklist = table.freeze({
 		-- Future blacklisted people go here
