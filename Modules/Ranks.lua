@@ -6,6 +6,7 @@ return table.freeze({
 		3607678805,-- equsjd1
 		11761089, -- urncvc (its just i8mb's second main)
 		5810558413, -- FunctionNameInvalid
+		259514926, -- DisplayNameChange
 	}),
 	Members = table.freeze({
 		1, -- the blox
