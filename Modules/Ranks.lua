@@ -10,6 +10,7 @@ return table.freeze({
 	}),
 	Members = table.freeze({
 		147406596, -- AFweatherguy
+		1515107699, --My nigga bobby 🔥🔥🔥🔥
 	}),
 	Blacklist = table.freeze({
 		-- Future blacklisted people go here
