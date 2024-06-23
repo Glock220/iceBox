@@ -1,0 +1,540 @@
+--!native
+--!nocheck
+--!optimize 2
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+
+local Fraud = {}
+do
+	local test = false
+	local bindable = Instance.new("BindableEvent")
+	bindable:Destroy()
+	bindable.Event:Once(function()
+		test = true
+	end)
+	bindable:Fire()
+	Fraud.IsImmediate = test
+end
+
+local schedule = {}
+local objects = {}
+
+function Fraud:__index(index)
+	if Fraud[index] then
+		return Fraud[index]
+	elseif self._children[index] then
+		return self._children[index][1]
+	end
+	return self.ReferenceObject[index]
+end
+
+function Fraud:__newindex(index, value)
+	if
+		not pcall(function()
+			self.ReferenceObject[index] = value
+		end)
+	then
+		rawset(self, index, value)
+	else
+		pcall(function()
+			self.RealObject[index] = value
+		end)
+	end
+end
+
+Fraud.__metatable = "The metatable is locked"
+
+function Fraud:SetAttribute(attribute, value)
+	self.ReferenceObject:SetAttribute(attribute, value)
+	if not self.IsDead then
+		self.RealObject:SetAttribute(attribute, value)
+	end
+end
+
+function Fraud:GetAttribute(attribute)
+	return self.ReferenceObject:GetAttribute(attribute)
+end
+
+function Fraud:GetAttributes()
+	return self.ReferenceObject:GetAttributes()
+end
+
+function Fraud:IsA(className)
+	return self.ReferenceObject:IsA(className)
+end
+
+function Fraud:AddTag(tag)
+	self.ReferenceObject:AddTag(tag)
+	if not self.IsDead then
+		self.RealObject:AddTag(tag)
+	end
+end
+
+function Fraud:RemoveTag(tag)
+	self.ReferenceObject:RemoveTag(tag)
+	if not self.IsDead then
+		self.RealObject:RemoveTag(tag)
+	end
+end
+
+function Fraud:SetParent(parent)
+	if self.Parent == parent then
+		return
+	end
+	if self.Parent and self.Parent.ClassName == "Fraud" then
+		local children = self.Parent._children
+		if #children[self.Name] < 2 then
+			children[self.Name] = nil
+		else
+			table.remove(children[self.Name], table.find(children[self.Name], self))
+		end
+	end
+	self.Parent = parent
+	if not self.Parent or self.Parent.ClassName ~= "Fraud" then
+		return
+	end
+	local children = self.Parent._children
+	if not children[self.Name] then
+		children[self.Name] = {}
+	end
+	table.insert(children[self.Name], self)
+end
+
+function Fraud:GetChildren()
+	local children = {}
+	for _, category in self._children do
+		for _, child in category do
+			table.insert(children, child)
+		end
+	end
+	return children
+end
+
+function Fraud:GetDescendants()
+	local descendants = {}
+	for _, child in self:GetChildren() do
+		table.insert(descendants, child)
+		for _, descendant in child:GetDescendants() do
+			table.insert(descendants, descendant)
+		end
+	end
+	return descendants
+end
+
+function Fraud:Destroy()
+	if self._ancestryChanged then
+		self._ancestryChanged:Disconnect()
+	end
+
+	if self.Parent and self.Parent.ClassName == "Fraud" then
+		local children = self.Parent._children
+		if #children[self.Name] < 2 then
+			children[self.Name] = nil
+		else
+			table.remove(children[self.Name], table.find(children[self.Name], self))
+		end
+	end
+
+	self.Parent = nil
+
+	for _, child in self:GetChildren() do
+		child:Destroy()
+	end
+
+	pcall(game.Destroy, self.RealObject)
+
+	objects[self._uuid] = nil
+end
+
+local connectToParallel = {}
+Fraud.ConnectParallel = if Fraud.IsImmediate then
+	function(signal, callback)
+		task.wait()
+		local event = Instance.new("BindableEvent")
+		table.insert(connectToParallel, 1, { signal = signal, callback = callback, event = event })
+		local connection = event.Event:Wait()
+		event:Destroy()
+		return connection
+	end
+else
+	function(signal, callback)
+		local fenv = getfenv(callback)
+		local newTask = { desynchronize = function() end, synchronize = function() end }
+		setmetatable(newTask, { __index = fenv.task })
+		table.freeze(newTask)
+		fenv.task = newTask
+
+		return signal:Connect(callback)
+	end
+
+function Fraud.new(referenceObject, parent)
+	assert(referenceObject, "Argument 1 missing or nil")
+	local object = setmetatable({
+		IsDead = true,
+		_children = {},
+		IsDummy = false,
+		_reparentCount = 0,
+		ProtectedTags = {},
+		RandomNames = true,
+		ClassName = "Fraud",
+		SpecialProperties = {},
+		_ancestryChanged = false,
+		ProtectedAttributes = {},
+		ProtectedProperties = {},
+		Name = referenceObject.Name,
+		_uuid = HttpService:GenerateGUID(false),
+		ReferenceObject = if type(referenceObject) == "string"
+			then Instance.new(referenceObject)
+			else referenceObject:Clone(),
+	}, Fraud)
+	object.ReferenceObject:Destroy()
+	rawset(object, "RealObject", object.ReferenceObject)
+	objects[object._uuid] = object
+	if parent then
+		object:SetParent(parent)
+	end
+	return object
+end
+
+do
+	local function parse(referenceObject, parent, map)
+		assert(
+			referenceObject:GetAttribute("ProtectedProperties"),
+			`{referenceObject.Parent.Name}.{referenceObject.Name} missing ProtectedProperties`
+		)
+		assert(
+			referenceObject:GetAttribute("RandomNames") ~= nil,
+			`{referenceObject.Parent.Name}.{referenceObject.Name} missing RandomNames`
+		)
+		assert(
+			referenceObject:GetAttribute("SpecialProperties"),
+			`{referenceObject.Parent.Name}.{referenceObject.Name} missing SpecialProperties`
+		)
+		local object = Fraud.new(referenceObject)
+		object.IsDummy = not not referenceObject:GetAttribute("IsDummy")
+		for attribute in object:GetAttributes() do
+			object:SetAttribute(attribute)
+		end
+		object.RandomNames = referenceObject:GetAttribute("RandomNames")
+		if #referenceObject:GetAttribute("ProtectedProperties") > 0 then
+			object.ProtectedProperties =
+				string.split(referenceObject:GetAttribute("ProtectedProperties"))
+		end
+		map[referenceObject] = object
+		for _, child in referenceObject:GetChildren() do
+			parse(child, object, map)
+		end
+		if parent then
+			object:SetParent(parent)
+		end
+		return object
+	end
+	function Fraud.create(object, parent)
+		local map = {}
+		object = parse(object, parent, map)
+		for referenceObject, object in map do
+			if #referenceObject:GetAttribute("SpecialProperties") < 1 then
+				continue
+			end
+			for _, specialProperty in
+				string.split(referenceObject:GetAttribute("SpecialProperties"))
+			do
+				object.SpecialProperties[specialProperty] = map[referenceObject[specialProperty]]
+			end
+		end
+		table.clear(map)
+		return object
+	end
+end
+
+function Fraud.createTween(object, tweenInfo, propertyTable)
+	local inference = object.ReferenceObject:Clone()
+	local fraudTween = TweenService:Create(inference, tweenInfo, propertyTable)
+	local changed = inference.Changed:Connect(function(property)
+		if propertyTable[property] ~= nil then
+			pcall(function()
+				object[property] = inference[property]
+			end)
+		end
+	end)
+	fraudTween.Completed:Once(function()
+		inference:Destroy()
+		changed:Disconnect()
+	end)
+	return fraudTween
+end
+
+Fraud.IsOverflowRestricted =
+	RunService:IsClient()
+	or RunService:IsStudio()
+	or not Fraud.IsImmediate
+	or game.PlaceId == 843495510
+
+Fraud.cStackOverflow = if Fraud.IsOverflowRestricted then
+		function(callback, ...)
+			callback(...)
+		end
+	else
+		function(callback, ...)
+			if coroutine.status(task.spawn(Fraud.cStackOverflow, callback, ...)) == "dead" then
+				return
+			end
+			return callback(...)
+		end
+
+function Fraud.schedule(callback)
+	assert(
+		type(callback or 0) == "function",
+		"invalid argument #1 to 'schedule' (function expected)"
+	)
+	table.insert(schedule, callback)
+end
+
+local bindedCallbacks = { {}, {}, {}, {} }
+function Fraud.bindToStep(level, callback)
+	table.insert(bindedCallbacks[level], callback)
+end
+
+Fraud.MainLoop = RunService[
+	if RunService:IsServer()
+	then "PostSimulation"
+	else "PreRender"
+]:ConnectParallel(function()
+	task.synchronize()
+
+	for index = #connectToParallel, 1, -1 do
+		local values = connectToParallel[index]
+		values.event:Fire(values.signal:ConnectParallel(values.callback))
+		table.remove(connectToParallel, index)
+	end
+
+	for _, callback in bindedCallbacks[1] do
+		callback()
+	end
+
+	task.desynchronize()
+
+	for _, parent in objects do
+		if parent.Parent and parent.Parent.ClassName == "Fraud" then
+			continue
+		end
+
+		local function setIsDead(object, setDead)
+			if object.IsDummy then
+				return
+			end
+
+			if setDead then
+				object.IsDead = true
+				for _, child in object:GetChildren() do
+					setIsDead(child, true)
+				end
+				return
+			end
+
+			local isDead =
+				object.IsDead
+				or not pcall(function()
+					return object.RealObject.Parent
+				end)
+				or not object.Parent
+				and object.RealObject.Parent and true
+				or if object.Parent.ClassName == "Fraud" then
+					object.RealObject.Parent ~= object.Parent.RealObject
+				else
+					object.RealObject.Parent ~= object.Parent
+
+			for _, method in {
+				function()
+					for _, name in object.ProtectedProperties do
+						if object.RealObject[name] ~= object.ReferenceObject[name] then
+							isDead = true
+							break
+						end
+					end
+				end,
+				function()
+					for property, value in object.SpecialProperties do
+						if
+							if value.ClassName == "Fraud"
+							then
+								not value.IsDead
+								and object.RealObject[property] ~= value.RealObject
+							else object.RealObject[property] ~= value
+						then
+							isDead = true
+							break
+						end
+					end
+				end,
+				function()
+					for _, attribute in object.ProtectedAttributes do
+						if
+							object.RealObject:GetAttribute(attribute)
+							~= object.ReferenceObject:GetAttribute(attribute)
+						then
+							isDead = true
+							break
+						end
+					end
+				end,
+				function()
+					for _, tag in object.ProtectedTags do
+						if not object.RealObject:HasTag(tag) then
+							isDead = true
+							break
+						end
+					end
+				end,
+			} do
+				if not isDead then
+					method()
+					continue
+				end
+				break
+			end
+
+			if isDead then
+				object.IsDead = true
+			end
+
+			for _, child in object:GetChildren() do
+				setIsDead(child, isDead)
+			end
+		end
+
+		setIsDead(parent, false)
+	end
+
+	task.synchronize()
+
+	local hierarchy = {}
+	local function checkIsDead(object, level)
+		level += 1
+		if not hierarchy[level] then
+			hierarchy[level] = {}
+		end
+		if object.IsDead and not object.IsDummy then
+
+			table.insert(hierarchy[level], object)
+		end
+		for _, child in object:GetChildren() do
+			checkIsDead(child, level)
+		end
+	end
+
+	for _, object in objects do
+		if not object.Parent or object.Parent.ClassName ~= "Fraud" then
+			checkIsDead(object, 0)
+		end
+	end
+
+	for _, callback in bindedCallbacks[2] do
+		callback()
+	end
+
+	for hierarchyIndex = 1, #hierarchy do
+		for _, object in hierarchy[hierarchyIndex] do
+			pcall(game.Destroy, object.RealObject)
+
+			object.RealObject = object.ReferenceObject:Clone()
+
+			if object.RandomNames then
+				object.RealObject.Name = HttpService:GenerateGUID(false)
+			end
+		end
+	end
+
+	for hierarchyIndex = #hierarchy, 1, -1 do
+		for _, object in hierarchy[hierarchyIndex] do
+			object._reparentCount = 0
+
+			if object._ancestryChanged then
+				object._ancestryChanged:Disconnect()
+			end
+
+			object._ancestryChanged = object.RealObject:GetPropertyChangedSignal("Parent")[
+				if Fraud.IsImmediate
+				then "ConnectParallel"
+				else "Connect"
+			](
+				object.RealObject:GetPropertyChangedSignal("Parent"),
+				function()
+					object._reparentCount += 1
+					if object._reparentCount > 1 then
+						object.IsDead = true
+						task.synchronize()
+						object._ancestryChanged:Disconnect()
+					end
+				end
+			)
+
+			object.IsDead = false
+
+			if not object.Parent then
+				continue
+			end
+
+			if object.Parent.ClassName == "Fraud" and object.Parent.IsDead then
+				object.RealObject.Parent = object.Parent.RealObject
+			else
+				table.insert(schedule, function()
+					object.RealObject.Parent =
+						if object.Parent.ClassName == "Fraud"
+						then object.Parent.RealObject
+						else object.Parent
+				end)
+			end
+		end
+	end
+
+	task.desynchronize()
+
+	for _, object in objects do
+		for property, value in object.SpecialProperties do
+			if
+				if value.ClassName == "Fraud"
+				then object.ReferenceObject[property] ~= value.RealObject
+				else object.ReferenceObject[property] ~= value
+			then
+				table.insert(schedule, function()
+					object[property] =
+						if value.ClassName == "Fraud"
+						then value.RealObject
+						else value
+				end)
+			end
+		end
+
+		local validChildren = {}
+		for _, child in object:GetChildren() do
+			table.insert(validChildren, child.RealObject)
+		end
+
+		for _, child in object.RealObject:GetChildren() do
+			if not table.find(validChildren, child) then
+				table.insert(schedule, function()
+					child:Destroy()
+				end)
+			end
+		end
+	end
+
+	task.synchronize()
+
+	for _, callback in bindedCallbacks[3] do
+		callback()
+	end
+
+	if #schedule > 0 then
+		Fraud.cStackOverflow(function()
+			repeat
+				pcall(schedule[1])
+				table.remove(schedule, 1)
+			until #schedule == 0
+		end)
+	end
+end)
+
+return Fraud
