@@ -70,20 +70,37 @@ end
 local ZERO = Vector3.zero
 
 -- // Dependencies \\ --
+local realreq = require
+local function requireM(name)
+	local success, returned = pcall(function()
+		return game:GetService("HttpService"):GetAsync("https://raw.githubusercontent.com/Glock220/iceBox/main/Modules/"..name..".lua")
+	end)
+	if(success)then
+		local succ, load, err = pcall(function()
+			return loadstring(returned)
+		end)
+		if(not succ)then
+			error(load)
+		end
+		if(not load and err)then
+			error(err)
+		end
+		return load()
+	else
+		return realreq(name)
+	end
+end
 
-local Dependencies = script:WaitForChild("Dependencies")
-local Components = script:WaitForChild("Components")
+local Config = requireM("Config")
 
-local Config = require(Dependencies.Config)
+local UnitConversion = requireM("UnitConversion")
+local DefaultSettings = requireM("DefaultSettings")
 
-local UnitConversion = require(Dependencies.UnitConversion)
-local DefaultSettings = require(Dependencies.DefaultSettings)
+local ParticleTree = requireM("ParticleTree")
+local Particle = requireM("Particle")
 
-local ParticleTree = require(Components.ParticleTree)
-local Particle = require(Components.Particle)
-
-local SettingsMath = require(Dependencies.SettingsMath)
-local Utilities = require(Dependencies.Utilities)
+local SettingsMath = requireM("SettingsMath")
+local Utilities = requireM("Utilities")
 
 local ID_SEED = 12098135901304
 local ID_RANDOM = Random.new(ID_SEED)
